@@ -36,7 +36,7 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+#define SPI_FLASH_1_NAME	"spi_flash_1"
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

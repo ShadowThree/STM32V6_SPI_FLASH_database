@@ -25,6 +25,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "dbger.h"
+#include "sfud.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,13 +46,22 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+#define SFUD_DEMO_TEST_BUFFER_SIZE	256
+static uint8_t sfud_demo_test_buf[SFUD_DEMO_TEST_BUFFER_SIZE];
 
+#if !defined(SFUD_USING_SFDP)	&& !defined(SFUD_USING_FLASH_INFO_TABLE)
+sfud_flash spi_flash_1 = {
+        .name = SPI_FLASH_1_NAME,
+        .spi.name = "SPI3",
+        .chip = { "W25Q64JV", SFUD_MF_ID_WINBOND, 0x40, 0x17, 8L * 1024L * 1024L, SFUD_WM_PAGE_256B, 4096, 0x20 }
+};
+#endif
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+static void sfud_demo(uint32_t addr, size_t size, uint8_t *data);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -67,7 +77,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	sfud_err sfud_sta;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -91,7 +101,21 @@ int main(void)
   MX_SPI3_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-	LOG_DBG("\n\nSTM32V6 Flash database(FlashDB) demo...\n");
+	LOG_DBG("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");	// clear screen
+	LOG_DBG("STM32V6 Flash database(FlashDB) demo...\r\n");
+	
+#if	1 // test SFUD
+	#if !defined(SFUD_USING_SFDP)	&& !defined(SFUD_USING_FLASH_INFO_TABLE)
+	sfud_sta = sfud_device_init(&spi_flash_1);
+	#else
+	sfud_sta = sfud_init();
+	#endif
+	if(sfud_sta != SFUD_SUCCESS) {
+		LOG_ERR("sfud_device_init() err[%d]\r\n", sfud_sta);
+		while(1);
+	}
+	sfud_demo(0, sizeof(sfud_demo_test_buf), sfud_demo_test_buf);
+#endif
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -151,7 +175,64 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+static void sfud_demo(uint32_t addr, size_t size, uint8_t *data)
+{
+    sfud_err result = SFUD_SUCCESS;
+		#if !defined(SFUD_USING_SFDP)	&& !defined(SFUD_USING_FLASH_INFO_TABLE)
+    const sfud_flash *flash = &spi_flash_1;
+		#else
+		const sfud_flash *flash = sfud_get_device_table() + 0;
+		#endif
+    size_t i;
+    /* prepare write data */
+    for (i = 0; i < size; i++) {
+        data[i] = i;
+    }
+    /* erase test */
+    result = sfud_erase(flash, addr, size);
+    if (result == SFUD_SUCCESS) {
+        LOG_DBG("Erase the %s flash data finish. Start from 0x%08X, size is %d.\r\n", flash->name, addr, size);
+    } else {
+        LOG_ERR("Erase the %s flash data failed.\r\n", flash->name);
+        return;
+    }
+    /* write test */
+    result = sfud_write(flash, addr, size, data);
+    if (result == SFUD_SUCCESS) {
+        LOG_DBG("Write the %s flash data finish. Start from 0x%08X, size is %d.\r\n", flash->name, addr, size);
+    } else {
+        LOG_ERR("Write the %s flash data failed.\r\n", flash->name);
+        return;
+    }
+    /* read test */
+    result = sfud_read(flash, addr, size, data);
+    if (result == SFUD_SUCCESS) {
+        LOG_DBG("Read the %s flash data success. Start from 0x%08X, size is %d. The data is:\r\n", flash->name, addr, size);
+        LOG_DBG("Offset (h) 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F\r\n");
+        for (i = 0; i < size; i++) {
+            if (i % 16 == 0) {
+                LOG_DBG("[%08X] ", addr + i);
+            }
+            LOG_DBG("%02X ", data[i]);
+            if (((i + 1) % 16 == 0) || i == size - 1) {
+                LOG_DBG("\r\n");
+            }
+        }
+        LOG_DBG("\r\n");
+    } else {
+        LOG_ERR("Read the %s flash data failed.\r\n", flash->name);
+    }
+    /* data check */
+    for (i = 0; i < size; i++) {
+        if (data[i] != i % 256) {
+            LOG_ERR("Read and check write data has an error. Write the %s flash data failed.\r\n", flash->name);
+			break;
+        }
+    }
+    if (i == size) {
+        LOG_DBG("The %s flash test is success.\r\n", flash->name);
+    }
+}
 /* USER CODE END 4 */
 
 /**
