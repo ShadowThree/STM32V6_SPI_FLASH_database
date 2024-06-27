@@ -26,11 +26,21 @@
 /* USER CODE BEGIN Includes */
 #include "dbger.h"
 #include "sfud.h"
+#include "flashdb.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+#ifdef FDB_USING_TIMESTAMP_64BIT
+#define __PRITS "lld"
+#else
+#define __PRITS "d"
+#endif
 
+struct env_status {
+    int temp;
+    int humi;
+};
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -56,12 +66,19 @@ sfud_flash spi_flash_1 = {
         .chip = { "W25Q64JV", SFUD_MF_ID_WINBOND, 0x40, 0x17, 8L * 1024L * 1024L, SFUD_WM_PAGE_256B, 4096, 0x20 }
 };
 #endif
+
+struct fdb_tsdb tsdb = { 0 };
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+static fdb_time_t get_time(void);
 static void sfud_demo(uint32_t addr, size_t size, uint8_t *data);
+static void tsdb_sample(fdb_tsdb_t tsdb);
+static bool query_cb(fdb_tsl_t tsl, void *arg);
+static bool query_by_time_cb(fdb_tsl_t tsl, void *arg);
+static bool set_status_cb(fdb_tsl_t tsl, void *arg);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -101,10 +118,9 @@ int main(void)
   MX_SPI3_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-	LOG_DBG("\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n");	// clear screen
-	LOG_DBG("STM32V6 Flash database(FlashDB) demo...\r\n");
+	LOG_DBG("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");	// clear screen
+	LOG_DBG("STM32V6 Flash database(FlashDB) demo...\n");
 	
-#if	1 // test SFUD
 	#if !defined(SFUD_USING_SFDP)	&& !defined(SFUD_USING_FLASH_INFO_TABLE)
 	sfud_sta = sfud_device_init(&spi_flash_1);
 	#else
@@ -114,7 +130,22 @@ int main(void)
 		LOG_ERR("sfud_device_init() err[%d]\r\n", sfud_sta);
 		while(1);
 	}
+	
+#if	0 	// test SFUD
 	sfud_demo(0, sizeof(sfud_demo_test_buf), sfud_demo_test_buf);
+#endif
+	
+#if 1		// test FlashDB
+	fdb_err_t result;
+	result = fdb_tsdb_init(&tsdb, "log", "fdb_tsdb1", get_time, 128, NULL);
+	if (result != FDB_NO_ERR) {
+		LOG_ERR("fdb_tsdb_init err[%d]\n", result);
+		while(1);
+	}
+	// fdb_tsl_clean(&tsdb);		// clean database, must call after fdb_tsdb_init()
+	uint32_t counts = get_time();
+	fdb_tsdb_control(&tsdb, FDB_TSDB_CTRL_GET_LAST_TIME, &counts);
+	tsdb_sample(&tsdb);
 #endif
   /* USER CODE END 2 */
 
@@ -232,6 +263,99 @@ static void sfud_demo(uint32_t addr, size_t size, uint8_t *data)
     if (i == size) {
         LOG_DBG("The %s flash test is success.\r\n", flash->name);
     }
+}
+
+static void tsdb_sample(fdb_tsdb_t tsdb)
+{
+    struct fdb_blob blob;
+
+    LOG_DBG("==================== tsdb_sample ====================\n");
+
+    { /* APPEND new TSL (time series log) */
+        struct env_status status;
+
+        /* append new log to TSDB */
+        status.temp = 36;
+        status.humi = 85;
+        fdb_tsl_append(tsdb, fdb_blob_make(&blob, &status, sizeof(status)));
+        LOG_DBG("append the new status.temp (%d) and status.humi (%d)\n", status.temp, status.humi);
+
+        status.temp = 38;
+        status.humi = 90;
+        fdb_tsl_append(tsdb, fdb_blob_make(&blob, &status, sizeof(status)));
+        LOG_DBG("append the new status.temp (%d) and status.humi (%d)\n", status.temp, status.humi);
+    }
+
+    { /* QUERY the TSDB */
+        /* query all TSL in TSDB by iterator */
+        fdb_tsl_iter(tsdb, query_cb, tsdb);
+    }
+
+    { /* QUERY the TSDB by time */
+        /* prepare query time (from 1970-01-01 00:00:00 to 2020-05-05 00:00:00) */
+        struct tm tm_from = { .tm_year = 1970 - 1900, .tm_mon = 0, .tm_mday = 1, .tm_hour = 0, .tm_min = 0, .tm_sec = 0 };
+        struct tm tm_to = { .tm_year = 2020 - 1900, .tm_mon = 4, .tm_mday = 5, .tm_hour = 0, .tm_min = 0, .tm_sec = 0 };
+        time_t from_time = mktime(&tm_from), to_time = mktime(&tm_to);
+        size_t count;
+        /* query all TSL in TSDB by time */
+        fdb_tsl_iter_by_time(tsdb, from_time, to_time, query_by_time_cb, tsdb);
+        /* query all FDB_TSL_WRITE status TSL's count in TSDB by time */
+        count = fdb_tsl_query_count(tsdb, from_time, to_time, FDB_TSL_WRITE);
+        LOG_DBG("query count is: %zu\n", count);
+    }
+
+    { /* SET the TSL status */
+        /* Change the TSL status by iterator or time iterator
+         * set_status_cb: the change operation will in this callback
+         *
+         * NOTE: The actions to modify the state must be in order.
+         *       like: FDB_TSL_WRITE -> FDB_TSL_USER_STATUS1 -> FDB_TSL_DELETED -> FDB_TSL_USER_STATUS2
+         *       The intermediate states can also be ignored.
+         *       such as: FDB_TSL_WRITE -> FDB_TSL_DELETED
+         */
+        fdb_tsl_iter(tsdb, set_status_cb, tsdb);
+    }
+
+    LOG_DBG("===========================================================\n");
+}
+
+static bool query_cb(fdb_tsl_t tsl, void *arg)
+{
+    struct fdb_blob blob;
+    struct env_status status;
+    fdb_tsdb_t db = arg;
+
+    fdb_blob_read((fdb_db_t) db, fdb_tsl_to_blob(tsl, fdb_blob_make(&blob, &status, sizeof(status))));
+    LOG_DBG("[query_cb] queried a TSL: time: %" __PRITS ", temp: %d, humi: %d\n", tsl->time, status.temp, status.humi);
+
+    return false;
+}
+
+static bool query_by_time_cb(fdb_tsl_t tsl, void *arg)
+{
+    struct fdb_blob blob;
+    struct env_status status;
+    fdb_tsdb_t db = arg;
+
+    fdb_blob_read((fdb_db_t) db, fdb_tsl_to_blob(tsl, fdb_blob_make(&blob, &status, sizeof(status))));
+    LOG_DBG("[query_by_time_cb] queried a TSL: time: %" __PRITS ", temp: %d, humi: %d\n", tsl->time, status.temp, status.humi);
+
+    return false;
+}
+
+static bool set_status_cb(fdb_tsl_t tsl, void *arg)
+{
+    fdb_tsdb_t db = arg;
+
+    LOG_DBG("set the TSL (time %" __PRITS ") status from %d to %d\n", tsl->time, tsl->status, FDB_TSL_USER_STATUS1);
+    fdb_tsl_set_status(db, tsl, FDB_TSL_USER_STATUS1);
+
+    return false;
+}
+
+static fdb_time_t get_time(void)
+{
+	return HAL_GetTick() + 5*365*24*60*60;
 }
 /* USER CODE END 4 */
 

@@ -1,3 +1,6 @@
 [submodule "ThirdUtils/SFUD"]
 	path = ThirdUtils/SFUD
 	url = https://github.com/armink/SFUD.git
+[submodule "ThirdUtils/FlashDB"]
+	path = ThirdUtils/FlashDB
+	url = https://github.com/armink/FlashDB.git

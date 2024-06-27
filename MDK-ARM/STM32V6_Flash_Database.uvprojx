@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F429xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;C:/Users/dengjunde/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.0/Drivers/STM32F4xx_HAL_Driver/Inc;C:/Users/dengjunde/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.0/Drivers/STM32F4xx_HAL_Driver/Inc/Legacy;C:/Users/dengjunde/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.0/Drivers/CMSIS/Device/ST/STM32F4xx/Include;C:/Users/dengjunde/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.0/Drivers/CMSIS/Include;..\ThirdUtils\dbger;..\ThirdUtils\SFUD_port;..\ThirdUtils\SFUD\sfud\inc</IncludePath>
+              <IncludePath>../Core/Inc;C:/Users/dengjunde/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.0/Drivers/STM32F4xx_HAL_Driver/Inc;C:/Users/dengjunde/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.0/Drivers/STM32F4xx_HAL_Driver/Inc/Legacy;C:/Users/dengjunde/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.0/Drivers/CMSIS/Device/ST/STM32F4xx/Include;C:/Users/dengjunde/STM32Cube/Repository/STM32Cube_FW_F4_V1.28.0/Drivers/CMSIS/Include;..\ThirdUtils\dbger;..\ThirdUtils\SFUD_port;..\ThirdUtils\SFUD\sfud\inc;..\ThirdUtils\FlashDB_port;..\ThirdUtils\FlashDB\inc;..\ThirdUtils\FlashDB\port\fal\inc</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -660,6 +660,56 @@
               <FileName>sfud_port.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\ThirdUtils\SFUD_port\sfud_port.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>ThirdUtils/FlashDB</GroupName>
+          <Files>
+            <File>
+              <FileName>fdb.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ThirdUtils\FlashDB\src\fdb.c</FilePath>
+            </File>
+            <File>
+              <FileName>fdb_utils.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ThirdUtils\FlashDB\src\fdb_utils.c</FilePath>
+            </File>
+            <File>
+              <FileName>fdb_tsdb.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ThirdUtils\FlashDB\src\fdb_tsdb.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>ThirdUtils/FlashDB_port</GroupName>
+          <Files>
+            <File>
+              <FileName>fal_flash_sfud_port.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ThirdUtils\FlashDB_port\fal_flash_sfud_port.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>ThirdUtils/FAL</GroupName>
+          <Files>
+            <File>
+              <FileName>fal.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ThirdUtils\FlashDB\port\fal\src\fal.c</FilePath>
+            </File>
+            <File>
+              <FileName>fal_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ThirdUtils\FlashDB\port\fal\src\fal_flash.c</FilePath>
+            </File>
+            <File>
+              <FileName>fal_partition.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\ThirdUtils\FlashDB\port\fal\src\fal_partition.c</FilePath>
             </File>
           </Files>
         </Group>
